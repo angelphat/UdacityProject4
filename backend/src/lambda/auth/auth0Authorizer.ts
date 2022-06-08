@@ -61,7 +61,9 @@ async function verifyToken(authHeader: string): Promise<JwtPayload> {
   // TODO: Implement token verification
   // You should implement it similarly to how it was implemented for the exercise for the lesson 5
   // You can read more about how to do this here: https://auth0.com/blog/navigating-rs256-and-jwks/
-  return undefined
+  const key = await getSigningKey(jwksUrl,jwt.header.kid)
+
+  return verify(token, key.publicKey, { algorithms: ['RS256'] }) as JwtPayload
 }
 
 function getToken(authHeader: string): string {
@@ -74,4 +76,41 @@ function getToken(authHeader: string): string {
   const token = split[1]
 
   return token
+}
+
+const getSigningKey =async (jwksUrl,kid) => {
+  const resHeader = await Axios.get(jwksUrl,{
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Credentials': "'true'"
+    }
+  })
+
+  const keys = resHeader.data.keys
+  const signingKeys = keys.filter((key) =>
+    key.use == 'sig' &&
+    key.kty == 'RSA' &&
+    key.kid &&
+    key.x5c &&
+    key.x5c.length
+  )
+  .map((key) => {
+    return { kid: key.kid, nbf: key.nbf, publicKey: certToPEM(key.x5c[0]) }
+  })
+
+  const signingKey = signingKeys.find((key) => key.kid === kid)
+  if (!signingKey) {
+    throw new Error('Invalid signing keys')
+    logger.error('No signing keys found')
+  }
+
+  logger.info('Signing keys created successfully ', signingKey)
+  return signingKey
+}
+
+function certToPEM(cert) {
+  cert = cert.match(/.{1,64}/g).join('\n')
+  cert = `-----BEGIN CERTIFICATE-----\n${cert}\n-----END CERTIFICATE-----\n`
+  return cert
 }

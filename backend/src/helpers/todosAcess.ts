@@ -1,16 +1,19 @@
 import * as AWS from 'aws-sdk'
-import * as AWSXRay from 'aws-xray-sdk'
+//import * as AWSXRay from 'aws-xray-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { createLogger } from '../utils/logger'
 import { TodoItem } from '../models/TodoItem';
 import { TodoUpdate } from '../models/TodoUpdate';
 
+const AWSXRay = require('aws-xray-sdk')
 const XAWS = AWSXRay.captureAWS(AWS)
+
+
 
 const logger = createLogger('TodosAccess')
 
 
-export class TodoAccess {
+export class TodosAccess {
     constructor(
         private readonly docClient:DocumentClient = createDynamoDBClient(),
         private readonly todosTable = process.env.TODOS_TABLE
@@ -51,8 +54,19 @@ export class TodoAccess {
         return todoItem
     }
 
+    async deleteTodoItem(userId: string, todoId: string) {
+      logger.info(`delete todo ${todoId}`)
+      await this.docClient.delete({
+        TableName: this.todosTable,
+        Key: {
+          userId,
+          todoId
+        }
+      }).promise()
+    }
+
     async updateTodoItem(userId: string, todoId: string, todoUpdate: TodoUpdate) {
-        logger.info(`Updating todo on ${todoId} with ${JSON.stringify(todoUpdate)}`)
+        logger.info(`Update todo on ${todoId} with ${JSON.stringify(todoUpdate)}`)
         await this.docClient.update({
             TableName: this.todosTable,
             Key: {
@@ -73,7 +87,7 @@ export class TodoAccess {
 
     async updateAttachmentUrl(userId: string, todoId: string, newUrl: string) {
         logger.info(
-          `Updating ${newUrl} attachment URL for todo ${todoId} in table ${this.todosTable}`
+          `Updating ${newUrl} attachment URL for todo ${todoId} of table ${this.todosTable}`
         )
     
         await this.docClient.update({
@@ -101,4 +115,3 @@ function createDynamoDBClient(): DocumentClient {
   
     return new XAWS.DynamoDB.DocumentClient()
 }
-// TODO: Implement the dataLayer logic
